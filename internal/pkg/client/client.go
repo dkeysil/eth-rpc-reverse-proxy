@@ -1,6 +1,8 @@
 package client
 
 import (
+	"path"
+
 	"github.com/valyala/fasthttp"
 )
 
@@ -22,12 +24,18 @@ func (c *reverseProxyClient) Do(ctx *fasthttp.RequestCtx, host string, res *fast
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 
-	// pass forwarded headers to letting backend knows the initiator of the request
-	req.Header.Add("X-Forwarded-For", ctx.RemoteAddr().String())
-	req.Header.AddBytesKV([]byte("X-Forwarded-Proto"), req.Header.Protocol())
-	req.Header.AddBytesKV([]byte("X-Forwarded-Host"), req.Header.Host())
+	ctx.Request.CopyTo(req)
 
-	req.SetHost(host)
+	// pass forwarded headers to letting backend knows the initiator of the request
+	req.Header.Add("X-Forwarded-For", ctx.RemoteIP().String())
+	req.Header.AddBytesKV([]byte("X-Forwarded-Proto"), ctx.Request.Header.Protocol())
+	req.Header.AddBytesKV([]byte("X-Forwarded-Host"), ctx.Request.Header.Host())
+
+	uri := &fasthttp.URI{}
+	uri.Parse([]byte{}, []byte(host))
+	path := path.Join(string(uri.Path()), string(ctx.Path()))
+	uri.SetPath(path)
+	req.SetURI(uri)
 
 	return c.client.Do(req, res)
 }

@@ -7,15 +7,18 @@ import (
 
 func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
 	resChan := make(chan *fasthttp.Response, 2)
+	errChan := make(chan error, 2)
+	defer close(resChan)
+	defer close(errChan)
 
-	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost(string(ctx.Path())), resChan)
-	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost(""), resChan)
+	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost("eth_call"), resChan, errChan)
+	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost(""), resChan, errChan)
 
 	for i := 0; i < 2; i++ {
 		select {
 		case res := <-resChan:
 			defer fasthttp.ReleaseResponse(res)
-			if !res.ConnectionClose() || res.StatusCode() >= 400 {
+			if res.StatusCode() >= 400 {
 				continue
 			}
 
@@ -23,6 +26,8 @@ func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
 
 			res.CopyTo(&ctx.Response)
 			return
+		case err := <-errChan:
+			zap.L().Error("backend is down", zap.Error(err))
 		case <-ctx.Done():
 			break
 		}
@@ -32,14 +37,24 @@ func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response = fasthttp.Response{
 		Header: fasthttp.ResponseHeader{},
 	}
-
+	// todo: write body that all backends is down
 	ctx.Response.Header.SetStatusCode(500)
 }
 
-func (s *Service) asyncRequest(ctx *fasthttp.RequestCtx, host string, resChan chan<- *fasthttp.Response) {
+func (s *Service) asyncRequest(ctx *fasthttp.RequestCtx, host string, resChan chan<- *fasthttp.Response, errChan chan<- error) {
 	zap.L().Info("requesting eth_call", zap.String("backend_host", host))
 	res := fasthttp.AcquireResponse()
 
-	s.Client.Do(ctx, host, res)
-	resChan <- res
+	defer func() {
+		if recover() != nil {
+			fasthttp.ReleaseResponse(res)
+		}
+	}()
+
+	if err := s.Client.Do(ctx, host, res); err != nil {
+		errChan <- err
+		fasthttp.ReleaseResponse(res)
+	} else {
+		resChan <- res
+	}
 }

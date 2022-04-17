@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -13,5 +15,5 @@ type config struct {
 }
 
 func NewConfig() (cfg config, _ error) {
-	return cfg, cleanenv.ReadConfig("config.json", &cfg)
+	return cfg, cleanenv.ReadConfig(os.Getenv("CONFIG_PATH"), &cfg)
 }
