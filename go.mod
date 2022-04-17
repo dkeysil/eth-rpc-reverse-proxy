@@ -11,6 +11,7 @@ require (
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/klauspost/compress v1.15.1 // indirect
+	github.com/matryer/is v1.4.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect

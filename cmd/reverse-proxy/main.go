@@ -5,6 +5,7 @@ import (
 
 	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/backend_resolver"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers"
+	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 )
@@ -13,8 +14,9 @@ func main() {
 	log, _ := zap.NewProduction()
 	zap.ReplaceGlobals(log)
 
-	client := fasthttp.Client{}
-	backendResolver := backendresolver.NewBackends([]string{"localhost:8081"}, []string{"localhost:8082"})
+	client := client.NewReverseProxyClient(&fasthttp.Client{})
+
+	backendResolver := backendresolver.NewResolver(map[string][]string{"*": {"localhost:8081"}, "/eth_call": {"localhost:8082"}})
 
 	service := &controllers.Service{
 		Client:          client,

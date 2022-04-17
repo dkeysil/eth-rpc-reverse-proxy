@@ -1,39 +1,47 @@
 package backendresolver
 
 import (
-	_ "github.com/golang/mock/mockgen"
+	"sync/atomic"
 )
 
 //go:generate mockgen -source=resolver.go -destination=mocks/resolver_mock.go BackendResolver
 type BackendResolver interface {
-	GetUpstreamHost() string
-	GetEthCallUpstreamHost() string
+	GetUpstreamHost(path string) string
 }
 
-type backends struct {
-	upstream        []string
-	ethCallUpstream []string
+type resolver struct {
+	upstreams map[string][]string
+	counters  map[string]*uint64
 }
 
-func NewBackends(upstream, ethCallUpstream []string) BackendResolver {
-	if len(upstream) == 0 {
-		panic("upstream list is empty")
+// NewResolver backend resolver constructor
+// upstreams map must have "*" key for the base upstream host getter
+func NewResolver(upstreams map[string][]string) BackendResolver {
+	if _, ok := upstreams["*"]; !ok {
+		panic("upstreams map must have \"*\" key for the base upstream host getter")
 	}
 
-	if len(ethCallUpstream) == 0 {
-		panic("eth call upstream list is empty")
+	resolver := &resolver{
+		upstreams: upstreams,
+		counters:  make(map[string]*uint64),
 	}
 
-	return &backends{
-		upstream:        upstream,
-		ethCallUpstream: ethCallUpstream,
+	for key := range upstreams {
+		counter := uint64(0)
+		resolver.counters[key] = &counter
 	}
+
+	return resolver
 }
 
-func (br *backends) GetUpstreamHost() string {
-	return br.upstream[len(br.upstream)-1]
-}
+// GetUpstreamHost returns upstream host selected with round robin
+// if upstreams list not found by path - will return host from base upstream list
+func (r *resolver) GetUpstreamHost(path string) string {
+	if _, ok := r.upstreams[path]; !ok {
+		path = "*"
+	}
 
-func (br *backends) GetEthCallUpstreamHost() string {
-	return br.ethCallUpstream[len(br.ethCallUpstream)-1]
+	defer atomic.AddUint64(r.counters[path], 1)
+	// first instance will have slightly more load
+	return r.upstreams[path][atomic.LoadUint64(r.counters[path])%uint64(len(r.upstreams[path]))]
 }

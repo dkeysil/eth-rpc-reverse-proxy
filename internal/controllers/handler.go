@@ -4,13 +4,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func (h *Service) AnyHandler(ctx *fasthttp.RequestCtx) {
-	host := ctx.Request.Host()
-	_ = host
-	req := &fasthttp.Request{}
-	ctx.Request.CopyTo(req)
-
-	req.SetHost(h.BackendResolver.GetUpstreamHost())
-	h.Client.Do(req, &ctx.Response)
-	return
+func (s *Service) AnyHandler(ctx *fasthttp.RequestCtx) {
+	host := s.BackendResolver.GetUpstreamHost(string(ctx.Path()))
+	s.Client.Do(ctx, host, &ctx.Response)
 }

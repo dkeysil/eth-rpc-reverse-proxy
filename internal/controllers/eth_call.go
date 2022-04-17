@@ -6,20 +6,10 @@ import (
 )
 
 func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
-	reqUpstream := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(reqUpstream)
-	ctx.Request.CopyTo(reqUpstream)
-	reqUpstream.SetHost(s.BackendResolver.GetUpstreamHost())
-
-	reqEthCallUpstream := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(reqEthCallUpstream)
-	ctx.Request.CopyTo(reqEthCallUpstream)
-	reqEthCallUpstream.SetHost(s.BackendResolver.GetEthCallUpstreamHost())
-
 	resChan := make(chan *fasthttp.Response, 2)
 
-	go s.requestEthCall(reqUpstream, resChan)
-	go s.requestEthCall(reqEthCallUpstream, resChan)
+	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost(string(ctx.Path())), resChan)
+	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost(""), resChan)
 
 	for i := 0; i < 2; i++ {
 		select {
@@ -46,11 +36,10 @@ func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.SetStatusCode(500)
 }
 
-func (s *Service) requestEthCall(req *fasthttp.Request, resChan chan<- *fasthttp.Response) {
-	// todo: reuse response with sync.Pool
-	zap.L().Info("requesting eth_call", zap.ByteString("backend_host", req.Host()))
+func (s *Service) asyncRequest(ctx *fasthttp.RequestCtx, host string, resChan chan<- *fasthttp.Response) {
+	zap.L().Info("requesting eth_call", zap.String("backend_host", host))
 	res := fasthttp.AcquireResponse()
 
-	s.Client.Do(req, res)
+	s.Client.Do(ctx, host, res)
 	resChan <- res
 }
