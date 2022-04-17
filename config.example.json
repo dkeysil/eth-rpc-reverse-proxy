@@ -1,0 +1,10 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": "8080"
+  },
+  "upstreams": {
+    "*": ["localhost:8081", "localhost:8082"],
+    "/custom_path": ["localhost:8083"]
+  }
+}
