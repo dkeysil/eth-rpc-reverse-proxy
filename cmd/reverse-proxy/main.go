@@ -46,6 +46,7 @@ func main() {
 
 	log.Info("starting listening", zap.String("host", config.Server.Host), zap.String("port", config.Server.Port))
 	fasthttp.ListenAndServe(fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port), func(ctx *fasthttp.RequestCtx) {
+		zap.L().Debug("got new request")
 		if bytes.Compare(ctx.Request.Header.Peek("Upgrade"), []byte("websocket")) == 0 {
 			ws.Upgrade(ctx)
 		} else {

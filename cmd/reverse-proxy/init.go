@@ -22,13 +22,14 @@ type Services struct {
 }
 
 type Resolvers struct {
-	backendResolver backendresolver.BackendResolver
-	idResolver      resolver.IDResolver
+	httpBackendResolver backendresolver.BackendResolver
+	wsBackendResolver   backendresolver.BackendResolver
+	idResolver          resolver.IDResolver
 }
 
 func NewClients(resolvers Resolvers) Clients {
 	httpClient := client.NewReverseProxyClient(&fasthttp.Client{})
-	wsClient := wsClient.NewWSReverseProxyClient(append(resolvers.backendResolver.GetAllUpstreams("ws:*"), resolvers.backendResolver.GetAllUpstreams("ws:eth_call")...), resolvers.idResolver)
+	wsClient := wsClient.NewWSReverseProxyClient(append(resolvers.wsBackendResolver.GetAllUpstreams("*"), resolvers.wsBackendResolver.GetAllUpstreams("eth_call")...), resolvers.idResolver)
 
 	return Clients{
 		httpClient:      httpClient,
@@ -39,11 +40,11 @@ func NewClients(resolvers Resolvers) Clients {
 func NewServices(clients Clients, resolvers Resolvers) Services {
 	httpService := httpControllers.Service{
 		Client:          clients.httpClient,
-		BackendResolver: resolvers.backendResolver,
+		BackendResolver: resolvers.httpBackendResolver,
 	}
 	wsService := wsControllers.Service{
 		Client:          clients.websocketClient,
-		BackendResolver: resolvers.backendResolver,
+		BackendResolver: resolvers.wsBackendResolver,
 		IDResolver:      resolvers.idResolver,
 	}
 
@@ -55,8 +56,9 @@ func NewServices(clients Clients, resolvers Resolvers) Services {
 
 func NewResolvers(config config.Config) Resolvers {
 	return Resolvers{
-		backendResolver: backendresolver.NewResolver(config.Upstreams),
-		idResolver:      resolver.NewIDResolver(),
+		httpBackendResolver: backendresolver.NewResolver(config.HTTPUpstreams),
+		wsBackendResolver:   backendresolver.NewResolver(config.WSUpstreams),
+		idResolver:          resolver.NewIDResolver(),
 	}
 
 }

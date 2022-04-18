@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"fmt"
 	"path"
 
 	"github.com/valyala/fasthttp"
@@ -36,6 +38,10 @@ func (c *reverseProxyClient) Do(ctx *fasthttp.RequestCtx, host string, res *fast
 	path := path.Join(string(uri.Path()), string(ctx.Path()))
 	uri.SetPath(path)
 	req.SetURI(uri)
+
+	if bytes.Equal(req.Header.Method(), []byte("GET")) {
+		fmt.Println(req)
+	}
 
 	return c.client.Do(req, res)
 }
