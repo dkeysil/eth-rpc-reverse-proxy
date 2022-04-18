@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/dgrr/websocket"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/config"
@@ -78,5 +79,7 @@ func main() {
 		} else {
 			r.Handler(ctx)
 		}
+
+		metrics.ResponseCodes.WithLabelValues(strconv.Itoa(ctx.Response.StatusCode())).Inc()
 	})
 }
