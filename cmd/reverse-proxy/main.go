@@ -6,13 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dgrr/websocket"
-	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/backend_resolver"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/config"
-	controllers "github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers/http"
-	wsControllers "github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers/ws"
-	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
-	client "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/http"
-	wsClient "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/ws"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 )
@@ -23,7 +17,7 @@ type Body struct {
 
 /*
 TODO:
-1. Websockets
+1. Websockets [done]
 2. Support of removing dead backends
 3. Retries
 4. Remove superfluous type conversion (string -> []byte)
@@ -41,24 +35,14 @@ func main() {
 		panic(err)
 	}
 
-	idResolver := resolver.NewIDResolver()
+	resolvers := NewResolvers(config)
 
-	client := client.NewReverseProxyClient(&fasthttp.Client{})
+	clients := NewClients(resolvers)
 
-	backendResolver := backendresolver.NewResolver(config.Upstreams)
-
-	service := &controllers.Service{
-		Client:          client,
-		BackendResolver: backendResolver,
-	}
-	wsService := &wsControllers.Service{
-		Client:          wsClient.NewWSReverseProxyClient(append(backendResolver.GetAllUpstreams("ws:*"), backendResolver.GetAllUpstreams("ws:eth_call")...), idResolver),
-		BackendResolver: backendResolver,
-		IDResolver:      idResolver,
-	}
+	services := NewServices(clients, resolvers)
 
 	ws := websocket.Server{}
-	ws.HandleData(wsService.OnMessage)
+	ws.HandleData(services.websocketService.OnMessage)
 
 	log.Info("starting listening", zap.String("host", config.Server.Host), zap.String("port", config.Server.Port))
 	fasthttp.ListenAndServe(fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port), func(ctx *fasthttp.RequestCtx) {
@@ -70,15 +54,15 @@ func main() {
 			if err == nil && len(body.Method) > 0 {
 				switch body.Method {
 				case "eth_call":
-					service.EthCallHandler(ctx)
+					services.httpService.EthCallHandler(ctx)
 				default:
-					service.AnyMethod(ctx, body.Method)
+					services.httpService.AnyMethod(ctx, body.Method)
 				}
 
 				return
 			}
 
-			service.Handler(ctx)
+			services.httpService.Handler(ctx)
 		}
 	})
 }
