@@ -6,7 +6,7 @@ import (
 )
 
 type IDResolver interface {
-	SetID(originalID, clientID uint64) ID
+	SetID(originalID []byte, clientID uint64) ID
 	PopID(requestID uint64) (ID, bool)
 }
 
@@ -16,7 +16,7 @@ type idResolver struct {
 
 type ID struct {
 	RequestID  uint64
-	OriginalID uint64
+	OriginalID []byte
 	ClientID   uint64
 }
 
@@ -24,7 +24,7 @@ func NewIDResolver() IDResolver {
 	return &idResolver{}
 }
 
-func (r *idResolver) SetID(originalID, clientID uint64) ID {
+func (r *idResolver) SetID(originalID []byte, clientID uint64) ID {
 	id := ID{RequestID: rand.Uint64(), OriginalID: originalID, ClientID: clientID}
 
 	r.pool.Store(id.RequestID, id)
