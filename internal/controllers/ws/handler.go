@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/dgrr/websocket"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/entities"
+	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -18,6 +19,7 @@ func (s *Service) OnMessage(c *websocket.Conn, isBinary bool, data []byte) {
 		}
 		return
 	}
+	metrics.TotalWSRequests.WithLabelValues(request.Method).Inc()
 
 	id := s.IDResolver.SetID(request.ID, c.ID())
 

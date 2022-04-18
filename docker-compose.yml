@@ -1,0 +1,47 @@
+version: '3.3'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.34.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - 9090:9090
+    restart: always
+
+  grafana:
+    image: grafana/grafana:8.4.6
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - 3000:3000
+  
+  golang:
+    container_name: golang
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - CONFIG_PATH=/config.json
+    volumes:
+      - ./config.json:/config.json
+    ports:
+      - 8080:8080
+
+volumes:
+  grafana_data:
+  prometheus_data:
