@@ -7,6 +7,7 @@ import (
 //go:generate mockgen -source=resolver.go -destination=mocks/resolver_mock.go BackendResolver
 type BackendResolver interface {
 	GetUpstreamHost(path string) string
+	GetAllUpstreams(path string) []string
 }
 
 type resolver struct {
@@ -44,4 +45,8 @@ func (r *resolver) GetUpstreamHost(path string) string {
 	defer atomic.AddUint64(r.counters[path], 1)
 	// first instance will have slightly more load
 	return r.upstreams[path][atomic.LoadUint64(r.counters[path])%uint64(len(r.upstreams[path]))]
+}
+
+func (r *resolver) GetAllUpstreams(path string) []string {
+	return r.upstreams[path]
 }
