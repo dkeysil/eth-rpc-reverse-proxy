@@ -10,6 +10,7 @@ import (
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/config"
 	controllers "github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers/http"
 	wsControllers "github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers/ws"
+	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
 	client "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/http"
 	wsClient "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/ws"
 	"github.com/valyala/fasthttp"
@@ -32,13 +33,15 @@ TODO:
 */
 
 func main() {
-	log, _ := zap.NewProduction()
+	log, _ := zap.NewDevelopment()
 	zap.ReplaceGlobals(log)
 
 	config, err := config.NewConfig()
 	if err != nil {
 		panic(err)
 	}
+
+	idResolver := resolver.NewIDResolver()
 
 	client := client.NewReverseProxyClient(&fasthttp.Client{})
 
@@ -49,8 +52,9 @@ func main() {
 		BackendResolver: backendResolver,
 	}
 	wsService := &wsControllers.Service{
-		Client:          wsClient.NewWSReverseProxyClient(backendResolver.GetAllUpstreams("ws:*")),
+		Client:          wsClient.NewWSReverseProxyClient(append(backendResolver.GetAllUpstreams("ws:*"), backendResolver.GetAllUpstreams("ws:eth_call")...), idResolver),
 		BackendResolver: backendResolver,
+		IDResolver:      idResolver,
 	}
 
 	ws := websocket.Server{}

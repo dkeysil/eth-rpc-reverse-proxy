@@ -5,23 +5,31 @@ import (
 	"sync"
 
 	"github.com/dgrr/websocket"
+	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
 	ws "github.com/fasthttp/websocket"
 	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 )
 
+/*
+TODO:
+1. duplicate call on eth_call
+2. keep alive backend upstreams
+3. refactor
+*/
+
 type WSReverseProxyClient interface {
-	Send(c *websocket.Conn, data []byte, host string) (err error)
+	Send(c *websocket.Conn, data []byte, host string, id resolver.ID) (err error)
 }
 
 type wsReverseProxyClient struct {
-	clientPool   sync.Map
-	clientIDPool sync.Map
-	backendPool  sync.Map
+	clientPool  sync.Map
+	backendPool sync.Map
+	idResolver  resolver.IDResolver
 }
 
-func NewWSReverseProxyClient(upstreams []string) WSReverseProxyClient {
-	client := &wsReverseProxyClient{}
+func NewWSReverseProxyClient(upstreams []string, idResolver resolver.IDResolver) WSReverseProxyClient {
+	client := &wsReverseProxyClient{idResolver: idResolver}
 	for _, host := range upstreams {
 		backendConn, _, err := ws.DefaultDialer.Dial(host, nil)
 		if err != nil {
@@ -35,7 +43,7 @@ func NewWSReverseProxyClient(upstreams []string) WSReverseProxyClient {
 	return client
 }
 
-func (wsc *wsReverseProxyClient) Send(clientConn *websocket.Conn, data []byte, host string) (err error) {
+func (wsc *wsReverseProxyClient) Send(clientConn *websocket.Conn, data []byte, host string, id resolver.ID) (err error) {
 	conn, ok := wsc.backendPool.Load(host)
 	if !ok {
 		panic("can't get backend conn by host")
@@ -43,18 +51,8 @@ func (wsc *wsReverseProxyClient) Send(clientConn *websocket.Conn, data []byte, h
 
 	backendConn := conn.(*ws.Conn)
 
-	wsc.clientPool.LoadOrStore(clientConn.ID(), clientConn)
-
-	var id ID
-	err = json.Unmarshal(data, &id)
-	if err != nil {
-		zap.L().Error("error while unmarshaling", zap.Error(err))
-		return err
-	}
-
-	wsc.clientIDPool.Store(clientConn.ID(), id.ID)
-
-	data, err = sjson.SetBytes(data, "id", clientConn.ID())
+	wsc.clientPool.LoadOrStore(id.ClientID, clientConn)
+	data, err = sjson.SetBytes(data, "id", id.RequestID)
 	if err != nil {
 		return err
 	}
@@ -76,42 +74,42 @@ func (wsc *wsReverseProxyClient) listener(backendConn *ws.Conn) {
 		_, message, err := backendConn.ReadMessage()
 		if err != nil {
 			zap.L().Error("error in listener", zap.Error(err))
-			// if error have to close both connections
 			return
 		}
 		zap.L().Info("got message from backendConn", zap.ByteString("message", message))
 
-		var id ID
-		err = json.Unmarshal(message, &id)
+		var requestID ID
+		err = json.Unmarshal(message, &requestID)
 		if err != nil {
 			zap.L().Error("error while unmarshaling", zap.Error(err))
 			continue
 		}
 
-		conn, ok := wsc.clientPool.Load(id.ID)
+		id, ok := wsc.idResolver.PopID(requestID.ID)
 		if !ok {
-			zap.L().Error("can't get client conn", zap.Uint64("id", id.ID))
+			zap.L().Debug("got duplicated request")
+			continue
+		}
+
+		conn, ok := wsc.clientPool.Load(id.ClientID)
+		if !ok {
+			zap.L().Error("can't get client conn", zap.Uint64("client_id", id.ClientID), zap.Uint64("original_id", id.OriginalID), zap.Uint64("request_id", requestID.ID))
 			continue
 		}
 
 		clientConn := conn.(*websocket.Conn)
 
-		tempID, _ := wsc.clientIDPool.Load(clientConn.ID())
-		originalID := tempID.(uint64)
-
-		message, err = sjson.SetBytes(message, "id", originalID)
+		message, err = sjson.SetBytes(message, "id", id.OriginalID)
 		if err != nil {
-			zap.L().Error("error while setting original id to message", zap.Error(err), zap.Uint64("original_id", originalID), zap.Uint64("id", id.ID))
-			wsc.clientPool.Delete(id.ID)
-			wsc.clientIDPool.Delete(clientConn.ID())
+			zap.L().Error("error while setting original id to message", zap.Error(err), zap.Uint64("client_id", id.ClientID), zap.Uint64("original_id", id.OriginalID), zap.Uint64("request_id", requestID.ID))
+			wsc.clientPool.Delete(id.ClientID)
 			return
 		}
 
 		_, err = clientConn.Write(message)
 		if err != nil {
-			zap.L().Error("error while writing to clientConn", zap.Error(err), zap.Uint64("id", id.ID))
-			wsc.clientPool.Delete(id.ID)
-			wsc.clientIDPool.Delete(clientConn.ID())
+			zap.L().Error("error while writing to clientConn", zap.Error(err), zap.Uint64("client_id", id.ClientID), zap.Uint64("original_id", id.OriginalID), zap.Uint64("request_id", requestID.ID))
+			wsc.clientPool.Delete(id.ClientID)
 			return
 		}
 	}
