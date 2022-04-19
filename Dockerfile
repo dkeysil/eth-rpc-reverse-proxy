@@ -20,8 +20,6 @@ WORKDIR /
 
 COPY --from=build /reverse-proxy /reverse-proxy
 
-EXPOSE 8080
-
 USER nonroot:nonroot
 
 ENTRYPOINT ["/reverse-proxy"]
