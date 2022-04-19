@@ -12,11 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-/*
-TODO:
-3. refactor
-*/
-
 type WSReverseProxyClient interface {
 	Send(c *websocket.Conn, data []byte, host string, id resolver.ID) (err error)
 }
@@ -33,8 +28,9 @@ func NewWSReverseProxyClient(upstreams []string, idResolver resolver.IDResolver,
 	for _, host := range upstreams {
 		backendConn, _, err := ws.DefaultDialer.Dial(host, nil)
 		if err != nil {
-			// TODO: ???
-			panic(err)
+			zap.L().Error("removing not working ws backend conn", zap.String("host", host), zap.Error(err))
+			backendResolver.RemoveHost(host)
+			continue
 		}
 		client.backendPool.Store(host, backendConn)
 

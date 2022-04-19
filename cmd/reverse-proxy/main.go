@@ -15,16 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-/*
-TODO:
-1. Websockets [done]
-2. Support of removing dead backends [done]
-3. Retries [done]
-4. More logs
-5. Prometheus + Grafana [done]
-6. Docker [done]
-*/
-
 func main() {
 	log, _ := zap.NewDevelopment()
 	zap.ReplaceGlobals(log)
