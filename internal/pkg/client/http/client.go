@@ -1,8 +1,6 @@
 package client
 
 import (
-	"bytes"
-	"fmt"
 	"path"
 
 	"github.com/valyala/fasthttp"
@@ -22,6 +20,7 @@ func NewReverseProxyClient(client *fasthttp.Client) ReverseProxyClient {
 	}
 }
 
+// Do copying users request, add X-Forwarded headers, changing URI to one of the upstreams
 func (c *reverseProxyClient) Do(ctx *fasthttp.RequestCtx, host string, res *fasthttp.Response) error {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -33,15 +32,12 @@ func (c *reverseProxyClient) Do(ctx *fasthttp.RequestCtx, host string, res *fast
 	req.Header.AddBytesKV([]byte("X-Forwarded-Proto"), ctx.Request.Header.Protocol())
 	req.Header.AddBytesKV([]byte("X-Forwarded-Host"), ctx.Request.Header.Host())
 
-	uri := &fasthttp.URI{}
-	uri.Parse([]byte{}, []byte(host))
-	path := path.Join(string(uri.Path()), string(ctx.Path()))
-	uri.SetPath(path)
-	req.SetURI(uri)
-
-	if bytes.Equal(req.Header.Method(), []byte("GET")) {
-		fmt.Println(req)
-	}
+	// extend upstreams path with user path
+	upstreamURI := &fasthttp.URI{}
+	upstreamURI.Parse([]byte{}, []byte(host))
+	path := path.Join(string(upstreamURI.Path()), string(ctx.Path()))
+	upstreamURI.SetPath(path)
+	req.SetURI(upstreamURI)
 
 	return c.client.Do(req, res)
 }

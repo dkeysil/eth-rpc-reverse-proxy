@@ -37,8 +37,8 @@ func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response = fasthttp.Response{
 		Header: fasthttp.ResponseHeader{},
 	}
-	// todo: write body that all backends is down
 	ctx.Response.Header.SetStatusCode(500)
+	ctx.Response.SetBodyString("all backends is down")
 }
 
 func (s *Service) asyncRequest(ctx *fasthttp.RequestCtx, host string, resChan chan<- *fasthttp.Response, errChan chan<- error) {

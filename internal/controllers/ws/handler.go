@@ -23,15 +23,9 @@ func (s *Service) OnMessage(c *websocket.Conn, isBinary bool, data []byte) {
 
 	id := s.IDResolver.SetID(request.ID, c.ID())
 
-	err = s.Client.Send(c, data, s.BackendResolver.GetUpstreamHost("*"), id)
-	if err != nil {
-		zap.L().Error(err.Error())
-	}
+	go s.Client.Send(c, data, s.BackendResolver.GetUpstreamHost("*"), id)
 
 	if request.Method == "eth_call" {
-		err = s.Client.Send(c, data, s.BackendResolver.GetUpstreamHost("eth_call"), id)
-		if err != nil {
-			zap.L().Error(err.Error())
-		}
+		go s.Client.Send(c, data, s.BackendResolver.GetUpstreamHost("eth_call"), id)
 	}
 }

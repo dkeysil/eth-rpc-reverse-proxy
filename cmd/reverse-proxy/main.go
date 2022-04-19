@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -16,19 +15,14 @@ import (
 	"go.uber.org/zap"
 )
 
-type Body struct {
-	Method string `json:"method"`
-}
-
 /*
 TODO:
 1. Websockets [done]
 2. Support of removing dead backends
 3. Retries
-4. Remove superfluous type conversion (string -> []byte)
-5. More logs
-6. Prometheus + Grafana
-7. Docker [done]
+4. More logs
+5. Prometheus + Grafana [done]
+6. Docker [done]
 */
 
 func main() {
@@ -50,36 +44,19 @@ func main() {
 	ws.HandleData(services.websocketService.OnMessage)
 
 	r := router.New()
-	r.POST("/", func(ctx *fasthttp.RequestCtx) {
-		var body Body
-		err := json.Unmarshal(ctx.Request.Body(), &body)
-		if err == nil && len(body.Method) > 0 {
-			metrics.TotalHTTPRequests.WithLabelValues(body.Method).Inc()
-			switch body.Method {
-			case "eth_call":
-				services.httpService.EthCallHandler(ctx)
-			default:
-				services.httpService.AnyMethod(ctx, body.Method)
-			}
-
-			return
-		}
-	})
+	r.POST("/", services.httpService.EthCallHandler)
 
 	r.GET("/metrics", fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler()))
-
-	r.ANY("/*", services.httpService.Handler)
 
 	log.Info("starting listening", zap.String("host", config.Server.Host), zap.String("port", config.Server.Port))
 
 	fasthttp.ListenAndServe(fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port), func(ctx *fasthttp.RequestCtx) {
-		zap.L().Debug("got new request")
+		zap.L().Info("new request", zap.String("host", ctx.RemoteIP().String()))
 		if bytes.Compare(ctx.Request.Header.Peek("Upgrade"), []byte("websocket")) == 0 {
 			ws.Upgrade(ctx)
 		} else {
 			r.Handler(ctx)
+			metrics.ResponseCodes.WithLabelValues(strconv.Itoa(ctx.Response.StatusCode())).Inc()
 		}
-
-		metrics.ResponseCodes.WithLabelValues(strconv.Itoa(ctx.Response.StatusCode())).Inc()
 	})
 }

@@ -1,18 +1,18 @@
 package client
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/dgrr/websocket"
 	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
 	ws "github.com/fasthttp/websocket"
 	"github.com/tidwall/sjson"
+	"go.uber.org/zap"
 )
 
 /*
 TODO:
-1. duplicate call on eth_call
-2. keep alive backend upstreams
 3. refactor
 */
 
@@ -42,9 +42,16 @@ func NewWSReverseProxyClient(upstreams []string, idResolver resolver.IDResolver)
 }
 
 func (wsc *wsReverseProxyClient) Send(clientConn *websocket.Conn, data []byte, host string, id resolver.ID) (err error) {
+	defer func() {
+		if err != nil {
+			zap.L().Error("error while sending websocket request to backend", zap.String("host", host), zap.ByteString("original_id", id.OriginalID))
+			clientConn.Close()
+		}
+	}()
+
 	conn, ok := wsc.backendPool.Load(host)
 	if !ok {
-		panic("can't get backend conn by host")
+		return errors.New("can't load backend from pool")
 	}
 
 	backendConn := conn.(*ws.Conn)
