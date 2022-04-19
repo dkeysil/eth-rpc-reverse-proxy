@@ -34,12 +34,12 @@ func main() {
 	ws.HandleData(services.websocketService.OnMessage)
 
 	r := router.New()
-	r.POST("/", services.httpService.EthCallHandler)
+	r.POST("/", services.httpService.EthHandler)
 
+	// prometheus metrics handler
 	r.GET("/metrics", fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler()))
 
 	log.Info("starting listening", zap.String("host", config.Server.Host), zap.String("port", config.Server.Port))
-
 	fasthttp.ListenAndServe(fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port), func(ctx *fasthttp.RequestCtx) {
 		zap.L().Info("new request", zap.String("host", ctx.RemoteIP().String()))
 		if bytes.Compare(ctx.Request.Header.Peek("Upgrade"), []byte("websocket")) == 0 {

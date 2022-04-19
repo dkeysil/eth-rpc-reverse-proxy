@@ -2,60 +2,23 @@ package controllers
 
 import (
 	"github.com/valyala/fasthttp"
-	"go.uber.org/zap"
 )
 
+// EthCallHandler has to be duplicated to another list of backends
+// response - is the fastest response from backends
 func (s *Service) EthCallHandler(ctx *fasthttp.RequestCtx) {
-	resChan := make(chan *fasthttp.Response, 2)
-	errChan := make(chan error, 2)
-	defer close(resChan)
-	defer close(errChan)
+	resChan := make(chan *fasthttp.Response)
 
-	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost("eth_call"), resChan, errChan)
-	go s.asyncRequest(ctx, s.BackendResolver.GetUpstreamHost(""), resChan, errChan)
+	go s.Client.AsyncDo(ctx, s.BackendResolver.GetUpstreamHost("eth_call"), resChan)
+	go s.Client.AsyncDo(ctx, s.BackendResolver.GetUpstreamHost("*"), resChan)
 
-	for i := 0; i < 2; i++ {
-		select {
-		case res := <-resChan:
-			defer fasthttp.ReleaseResponse(res)
-			if res.StatusCode() >= 400 {
-				continue
-			}
+	res := <-resChan
+	defer fasthttp.ReleaseResponse(res)
 
-			zap.L().Info("response eth_call", zap.String("backend_host", res.RemoteAddr().String()))
-
-			res.CopyTo(&ctx.Response)
-			return
-		case err := <-errChan:
-			zap.L().Error("backend is down", zap.Error(err))
-		case <-ctx.Done():
-			break
-		}
+	if res.StatusCode() >= 400 {
+		res = <-resChan
+		defer fasthttp.ReleaseResponse(res)
 	}
 
-	zap.L().Error("no one backend upstream works")
-	ctx.Response = fasthttp.Response{
-		Header: fasthttp.ResponseHeader{},
-	}
-	ctx.Response.Header.SetStatusCode(500)
-	ctx.Response.SetBodyString("all backends is down")
-}
-
-func (s *Service) asyncRequest(ctx *fasthttp.RequestCtx, host string, resChan chan<- *fasthttp.Response, errChan chan<- error) {
-	zap.L().Info("requesting eth_call", zap.String("backend_host", host))
-	res := fasthttp.AcquireResponse()
-
-	defer func() {
-		if recover() != nil {
-			fasthttp.ReleaseResponse(res)
-		}
-	}()
-
-	if err := s.Client.Do(ctx, host, res); err != nil {
-		errChan <- err
-		fasthttp.ReleaseResponse(res)
-		s.BackendResolver.RemoveHost(host)
-	} else {
-		resChan <- res
-	}
+	res.CopyTo(&ctx.Response)
 }

@@ -35,7 +35,7 @@ func NewClients(resolvers Resolvers) Clients {
 			return true
 		},
 	}
-	httpClient := client.NewReverseProxyClient(fasthttpClient)
+	httpClient := client.NewReverseProxyClient(fasthttpClient, resolvers.httpBackendResolver)
 	wsClient := wsClient.NewWSReverseProxyClient(
 		append(resolvers.wsBackendResolver.GetAllUpstreams("*"), resolvers.wsBackendResolver.GetAllUpstreams("eth_call")...),
 		resolvers.idResolver,

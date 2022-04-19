@@ -6,16 +6,18 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func (s *Service) EthHandler(ctx *fasthttp.RequestCtx, method string) {
+// EthHandler receive reqeust and check eth-rpc request method
+// if method == eth_call - execute special logic for this case
+func (s *Service) EthHandler(ctx *fasthttp.RequestCtx) {
 	request, err := entities.NewRequest(ctx.Request.Body())
 
-	if err == nil && len(request.Method) > 0 {
+	if err == nil {
 		metrics.TotalHTTPRequests.WithLabelValues(request.Method).Inc()
 		switch request.Method {
 		case "eth_call":
 			s.EthCallHandler(ctx)
 		default:
-			s.AnyMethod(ctx, request.Method)
+			s.AnyMethod(ctx)
 		}
 
 		return

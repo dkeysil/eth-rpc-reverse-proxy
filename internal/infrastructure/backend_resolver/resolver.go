@@ -1,6 +1,7 @@
 package backendresolver
 
 import (
+	"os"
 	"sync"
 	"sync/atomic"
 )
@@ -66,7 +67,7 @@ func (r *resolver) RemoveHost(host string) {
 		for i, h := range upstreams {
 			if h == host {
 				if v := r.upstreams[path]; len(v) == 1 {
-					delete(r.upstreams, h)
+					delete(r.upstreams, path)
 				} else {
 					r.upstreams[path] = append(r.upstreams[path][:i], r.upstreams[path][i+1:]...)
 				}
@@ -76,7 +77,10 @@ func (r *resolver) RemoveHost(host string) {
 	}
 
 	if _, ok := r.upstreams["*"]; !ok {
-		panic("all backends removed")
+		// if all backends is down reverse-proxy can't work normally and it's should be restarted with
+		// there is can be less situations where we have to Exit program if we can manage list of backends in real time
+		// and proxy can check that some backends revive after removing and back them to the list
+		os.Exit(1)
 	}
 	r.RWMutex.Unlock()
 }
