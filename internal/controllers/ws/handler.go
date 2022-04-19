@@ -3,7 +3,7 @@ package controllers
 import (
 	"github.com/dgrr/websocket"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/entities"
-	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/metrics"
+	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/metrics"
 	"go.uber.org/zap"
 )
 

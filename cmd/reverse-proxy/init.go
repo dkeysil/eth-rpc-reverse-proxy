@@ -1,13 +1,13 @@
 package main
 
 import (
-	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/backend_resolver"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/config"
 	httpControllers "github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers/http"
 	wsControllers "github.com/dkeysil/eth-rpc-reverse-proxy/internal/controllers/ws"
-	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
-	client "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/http"
-	wsClient "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/ws"
+	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/backend_resolver"
+	client "github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/client/http"
+	wsClient "github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/client/ws"
+	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/id_resolver"
 	"github.com/valyala/fasthttp"
 )
 
@@ -28,8 +28,19 @@ type Resolvers struct {
 }
 
 func NewClients(resolvers Resolvers) Clients {
-	httpClient := client.NewReverseProxyClient(&fasthttp.Client{})
-	wsClient := wsClient.NewWSReverseProxyClient(append(resolvers.wsBackendResolver.GetAllUpstreams("*"), resolvers.wsBackendResolver.GetAllUpstreams("eth_call")...), resolvers.idResolver)
+	fasthttpClient := &fasthttp.Client{
+		RetryIf: func(request *fasthttp.Request) bool {
+			// if I correctly understand - all methods in eth-rpc is idempotent
+			// and for example, you can't double spend eth because signed transaction can be executed only once
+			return true
+		},
+	}
+	httpClient := client.NewReverseProxyClient(fasthttpClient)
+	wsClient := wsClient.NewWSReverseProxyClient(
+		append(resolvers.wsBackendResolver.GetAllUpstreams("*"), resolvers.wsBackendResolver.GetAllUpstreams("eth_call")...),
+		resolvers.idResolver,
+		resolvers.wsBackendResolver,
+	)
 
 	return Clients{
 		httpClient:      httpClient,

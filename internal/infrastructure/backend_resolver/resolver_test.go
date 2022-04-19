@@ -42,3 +42,24 @@ func TestGetUpstreamHost(t *testing.T) {
 	})
 
 }
+
+func TestRemoveHost(t *testing.T) {
+	is := is.New(t)
+
+	upstreams := map[string][]string{
+		"*":        {"localhost:8001", "localhost:8002", "localhost:8003"},
+		"eth_call": {"localhost:8001", "localhost:8002"},
+	}
+
+	expectedUpstreams := map[string][]string{
+		"*":        {"localhost:8002", "localhost:8003"},
+		"eth_call": {"localhost:8002"},
+	}
+	resolver := NewResolver(upstreams)
+
+	resolver.RemoveHost("localhost:8001")
+
+	for key, hosts := range upstreams {
+		is.Equal(hosts, expectedUpstreams[key])
+	}
+}

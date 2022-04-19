@@ -7,7 +7,7 @@ import (
 
 	"github.com/dgrr/websocket"
 	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/config"
-	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/metrics"
+	"github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/metrics"
 	"github.com/fasthttp/router"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/valyala/fasthttp"
@@ -18,8 +18,8 @@ import (
 /*
 TODO:
 1. Websockets [done]
-2. Support of removing dead backends
-3. Retries
+2. Support of removing dead backends [done]
+3. Retries [done]
 4. More logs
 5. Prometheus + Grafana [done]
 6. Docker [done]

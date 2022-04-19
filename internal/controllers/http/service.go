@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/backend_resolver"
-	client "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/client/http"
+	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/backend_resolver"
+	client "github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/client/http"
 )
 
 type Service struct {

@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/dgrr/websocket"
-	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
+	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/id_resolver"
 	ws "github.com/fasthttp/websocket"
 	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
@@ -22,8 +22,9 @@ func (wsc *wsReverseProxyClient) listener(backendConn *ws.Conn, host string) {
 	for {
 		message, err := wsc.readMessage(backendConn, host)
 		if err != nil {
-			// TODO: remove host which cannot be retried from list of upstreams
-			panic(err)
+			zap.L().Error("removing host", zap.Error(err), zap.String("host", host))
+			wsc.backendResolver.RemoveHost(host)
+			return
 		}
 
 		zap.L().Debug("got message from backendConn", zap.ByteString("message", message), zap.String("host", host))

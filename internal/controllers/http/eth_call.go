@@ -54,6 +54,7 @@ func (s *Service) asyncRequest(ctx *fasthttp.RequestCtx, host string, resChan ch
 	if err := s.Client.Do(ctx, host, res); err != nil {
 		errChan <- err
 		fasthttp.ReleaseResponse(res)
+		s.BackendResolver.RemoveHost(host)
 	} else {
 		resChan <- res
 	}

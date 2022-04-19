@@ -5,7 +5,8 @@ import (
 	"sync"
 
 	"github.com/dgrr/websocket"
-	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/id_resolver"
+	backendresolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/infrastructure/backend_resolver"
+	resolver "github.com/dkeysil/eth-rpc-reverse-proxy/internal/pkg/id_resolver"
 	ws "github.com/fasthttp/websocket"
 	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
@@ -21,16 +22,18 @@ type WSReverseProxyClient interface {
 }
 
 type wsReverseProxyClient struct {
-	clientPool  sync.Map
-	backendPool sync.Map
-	idResolver  resolver.IDResolver
+	clientPool      sync.Map
+	backendPool     sync.Map
+	idResolver      resolver.IDResolver
+	backendResolver backendresolver.BackendResolver
 }
 
-func NewWSReverseProxyClient(upstreams []string, idResolver resolver.IDResolver) WSReverseProxyClient {
-	client := &wsReverseProxyClient{idResolver: idResolver}
+func NewWSReverseProxyClient(upstreams []string, idResolver resolver.IDResolver, backendResolver backendresolver.BackendResolver) WSReverseProxyClient {
+	client := &wsReverseProxyClient{idResolver: idResolver, backendResolver: backendResolver}
 	for _, host := range upstreams {
 		backendConn, _, err := ws.DefaultDialer.Dial(host, nil)
 		if err != nil {
+			// TODO: ???
 			panic(err)
 		}
 		client.backendPool.Store(host, backendConn)
