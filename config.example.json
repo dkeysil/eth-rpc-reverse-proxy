@@ -1,11 +1,11 @@
 {
   "server": {
-    "host": "localhost",
+    "host": "0.0.0.0",
     "port": "8080"
   },
   "httpUpstreams": {
-    "*": ["localhost:8081", "localhost:8082"],
-    "/custom_path": ["localhost:8083"]
+    "*": ["http://localhost:8081", "http://localhost:8082"],
+    "/custom_path": ["http://localhost:8083"]
   },
   "wsUpstreams": {
     "*": ["ws://localhost:8081", "ws://localhost:8082"],
